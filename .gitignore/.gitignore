@@ -1,0 +1,2589 @@
+<?php  
+class Query_model extends CI_Model  {
+
+	public function __construct() {
+        parent::__construct();
+		error_reporting(E_ALL ^ (E_NOTICE | E_WARNING));
+		$this->load->helper('array');
+        $this->load->model('query_model'); 
+        $this->load->model('website_model'); 
+		$this->load->library("pagination");
+    }
+
+	public function ret_user_recharge_count(){
+		$this->db->where('ret_id',$_SESSION['retailer_id']);
+		$num_rows = $this->db->count_all_results('prime_member_payment_tbl');
+		return $num_rows;
+	}
+	public function ret_user_recharge_count_limit($limit, $start){
+		$this->db->where('ret_id',$_SESSION['retailer_id']);
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('prime_member_payment_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function admin_select_all_donars_count(){
+		$this->db->distinct();
+		$this->db->select('publish_by');
+		$this->db->where('isDonate', '1');
+		$query = $this->db->get('pdf_tbl');
+		return $query->num_rows();
+	}
+	public function admin_get_donars_limit($limit, $start){
+		########
+		$this->db->distinct();
+		$this->db->select('publish_by');
+		$this->db->where('isDonate', '1');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('pdf_tbl');
+		if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+		########
+	}
+	public function admin_get_sale_donars_limit($limit, $start){
+		########
+		$this->db->distinct();
+		$this->db->select('publish_by');
+		$this->db->where('isDonate', '1');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('pdf_tbl');
+		if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+		########
+	}
+	public function admin_tot_income_mothy(){
+		##
+		$this->db->like('add_date_time', date('Y-m'));
+		$query = $this->db->get('redeem_invoice_tbl');
+		foreach ($query->result() as $row){
+			$deal_cost=($row->pub_offer_cost*$row->pub_deal_percentage/100);
+			$helf_cost=($row->pub_offer_cost-$deal_cost);
+			$helf_rev[]=($helf_cost*15)/100;
+		}
+		$sale_income=array_sum($helf_rev);
+		##
+		##
+		$this->db->select_sum('buy_price');
+		$this->db->like('booking_date', date('Y-m-d'));
+		$result = $this->db->get('publisher_package')->row();  
+		$package_income=$result->buy_price;
+		###
+		$this->db->select_sum('price');
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$result = $this->db->get('retailer_credit_invoice_tbl')->row();  
+		$credit_income=$result->price;
+		###
+		return round(($sale_income+$package_income+$credit_income),2);
+	}
+	public function admin_select_all_pub_sales_count(){
+		if($_SESSION['pub_name']){
+			$this->db->where('username', $_SESSION['pub_name']);
+		}
+		$this->db->where('user_type', 'publisher');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_select_all_pub_sales_limi(){
+		$this->db->where('user_type', 'publisher');
+		if($_SESSION['pub_name']){
+			$this->db->where('username', $_SESSION['pub_name']);
+		}
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('user'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_select_all_retailer_sales_count(){
+		$this->db->where('user_type', 'retailer');
+		if($_SESSION['ret_name']){
+			$this->db->where('username', $_SESSION['ret_name']);
+		}
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_select_all_retailer_sales_limi(){
+		$this->db->where('user_type', 'retailer');
+		if($_SESSION['ret_name']){
+			$this->db->where('username', $_SESSION['ret_name']);
+		}
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('user'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_tot_donar(){
+		$this->db->where('isDonate', '1');
+		$query = $this->db->get('pdf_tbl');
+		$count=0;
+		foreach ($query->result() as $row){
+			$id[]=$row->publish_by;
+			
+		}
+		$arr=(array_unique($id));
+		return count($arr);
+	}
+	public function admin_tot_donar_today(){
+		$this->db->where('isDonate', '1');
+		$this->db->select('count(DISTINCT(publish_by))');  
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$query = $this->db->get('pdf_tbl');
+		$count=0;
+		foreach ($query->result() as $row){
+			$count=$count+1;
+		}
+		return $count;
+	}
+	public function admin_select_all_sale_report_count(){
+		if($_SESSION['u_name']){
+			$this->db->where('user_id', $_SESSION['u_name']);
+		}
+		if($_SESSION['month_select']<=9){
+			$m='0'.$_SESSION['month_select'];
+		}
+		else{
+			$m=$_SESSION['month_select'];
+		}
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function admin_get_sale_dfdfd_limit($limit, $start){
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		if($_SESSION['u_name']){
+			$this->db->where('user_id', $_SESSION['u_name']);
+		}
+		if($_SESSION['month_select']<=9){
+			$m='0'.$_SESSION['month_select'];
+		}
+		else{
+			$m=$_SESSION['month_select'];
+		}
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$query = $this->db->get('redeem_invoice_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function tot_online_sales(){
+		for($i=1;$i<=12;$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			$this->db->like('add_date_time', date('Y-'.$i.''));
+			$this->db->where('ret_id', '0');
+			$num_rows[] = $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		return implode(",",$num_rows);
+	}
+	public function tot_retaile_sales(){
+		for($i=1;$i<=12;$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			$this->db->like('add_date_time', date('Y-'.$i.''));
+			$this->db->where('ret_id!=', '0');
+			$num_rows[] = $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		return implode(",",$num_rows);
+	}
+	public function tot_pdf_donate_prime(){
+		$this->db->where('isDonate', '1');
+		$this->db->where('isPrime', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function tot_pdf_donate(){
+		$this->db->where('isDonate', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_tot_pdf_publish(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_tot_pdf(){
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_tot_clients_today(){
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$where = '(user_type="retailer" or user_type = "publisher")';
+		$this->db->where($where);
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_tot_clients(){
+		$where = '(user_type="retailer" or user_type = "publisher")';
+		$this->db->where($where);
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_tot_ret(){
+		$this->db->where('user_type', 'retailer');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_tot_ret_today(){
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$this->db->where('user_type', 'retailer');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_tot_income_graph(){
+		for($i=1;$i<=date('t');$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			##
+			$this->db->like('add_date_time', date('Y-m-'.$i.''));
+			$query = $this->db->get('redeem_invoice_tbl');
+			foreach ($query->result() as $row){
+				$deal_cost=($row->pub_offer_cost*$row->pub_deal_percentage/100);
+				$helf_cost[]=($row->pub_offer_cost-$deal_cost);
+			}
+			$sale_income=array_sum($helf_cost);
+			##
+			##
+			$this->db->select_sum('buy_price');
+			$this->db->like('booking_date', date('Y-m-'.$i.''));
+			$result = $this->db->get('publisher_package')->row();  
+			$package_income=$result->buy_price;
+			###
+			$this->db->select_sum('price');
+			$this->db->like('add_date_time', date('Y-m-'.$i.''));
+			$result = $this->db->get('retailer_credit_invoice_tbl')->row();  
+			$credit_income=$result->price;
+			###
+			$tot[]=($credit_income+$package_income+$sale_income);
+		}
+		return implode(",",$tot);
+	}
+	public function admin_tot_income_today(){
+		##
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$query = $this->db->get('redeem_invoice_tbl');
+		foreach ($query->result() as $row){
+			$deal_cost=($row->pub_offer_cost*$row->pub_deal_percentage/100);
+			$helf_cost=($row->pub_offer_cost-$deal_cost);
+			$helf_rev[]=($helf_cost*15)/100;
+		}
+		$sale_income=array_sum($helf_rev);
+		##
+		##
+		$this->db->select_sum('buy_price');
+		$this->db->like('booking_date', date('Y-m-d'));
+		$result = $this->db->get('publisher_package')->row();  
+		$package_income=$result->buy_price;
+		###
+		$this->db->select_sum('price');
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$result = $this->db->get('retailer_credit_invoice_tbl')->row();  
+		$credit_income=$result->price;
+		###
+		return round(($sale_income+$package_income+$credit_income),2);
+	}
+	public function admin_tot_income(){
+		##
+		$query = $this->db->get('redeem_invoice_tbl');
+		foreach ($query->result() as $row){
+			$deal_cost=($row->pub_offer_cost*$row->pub_deal_percentage/100);
+			$helf_cost=($row->pub_offer_cost-$deal_cost);
+			$helf_rev[]=($helf_cost*15)/100;
+		}
+		$sale_income=array_sum($helf_rev);
+		##
+		##
+		$this->db->select_sum('buy_price');
+		$result = $this->db->get('publisher_package')->row();  
+		$package_income=$result->buy_price;
+		###
+		$this->db->select_sum('price');
+		$result = $this->db->get('retailer_credit_invoice_tbl')->row();  
+		$credit_income=$result->price;
+		###
+		return round(($sale_income+$package_income+$credit_income),2);
+	}
+	public function admin_tot_pub_graph(){
+		for($i=1;$i<=date('t');$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			$this->db->like('add_date_time', date('Y-m-'.$i));
+			$this->db->where('user_type', 'publisher');
+			$num_rows[]= $this->db->count_all_results('user');
+		}
+		return implode(",",$num_rows);
+	}
+	public function select_all_publisher_today(){
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$this->db->where('user_type', 'publisher');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function admin_tot_sales_graph(){
+		for($i=1;$i<=date('t');$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			$this->db->like('add_date_time', date('Y-m-'.$i));
+			$num_rows[]= $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		return implode(",",$num_rows);
+	}
+	public function admin_tot_sales(){
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function admin_tot_sales_today(){
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function admin_fetch_user_graph(){
+		for($i=1;$i<=date('t');$i++){
+			if($i<=9){
+				$i='0'.$i;
+			}
+			$this->db->like('add_date_time', date('Y-m-'.$i));
+			$this->db->where('user_type', 'user');
+			$num_rows[]= $this->db->count_all_results('user');
+		}
+		return implode(",",$num_rows);
+	}
+	public function count_all_users(){
+		$this->db->where('user_type', 'user');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function count_all_weak(){
+		$this->db->like('add_date_time', date('Y-m-d'));
+		$this->db->where('user_type', 'user');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function total_uploads_book(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function select_all_prime_book(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('isDonate', '1');
+		$this->db->where('isPrime', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function select_all_free_book(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('isDonate', '1');
+		$this->db->where('isPrime', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function get_user_payment_history_count(){
+		$this->db->where('user_id', $_SESSION['user_id']);
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function get_user_payment_history_limit(){	
+		$this->db->where('user_id', $_SESSION['user_id']);
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('redeem_invoice_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_get_pending_pdf(){
+		$this->db->where('isDonate', '1');
+		$this->db->where('status', '0');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_get_pdf_search_count(){
+		if($_SESSION['title']){
+			$this->db->like('title', $_SESSION['title']); 
+		}
+		if($_SESSION['author_name']){
+			$this->db->like('author_name', $_SESSION['author_name']); 
+		}
+		if($_SESSION['cat_id']){
+			$this->db->like('category', $_SESSION['cat_id']); 
+		}
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_get_pdf_tredning_count(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('location', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_get_approved_pdf(){
+		$this->db->where('isReview', '1');
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function admin_get_pending_pdf_limit(){
+		$this->db->where('isDonate', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('disapprove_reason', '');
+		$this->db->where('status', '0');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_get_app_pdf_limit(){
+		$this->db->where('isReview', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_get_pdf_limit_search(){
+		if($_SESSION['title']){
+			$this->db->like('title', $_SESSION['title']); 
+		}
+		if($_SESSION['author_name']){
+			$this->db->like('author_name', $_SESSION['author_name']); 
+		}
+		if($_SESSION['cat_id']){
+			$this->db->like('category', $_SESSION['cat_id']); 
+		}
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_get_pdf_treding_search(){
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->where('isFeature', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function admin_get_approved_pdf_limit(){
+		$this->db->where('isReview', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function get_user_pending_pdf(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('status', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function get_user_rejected_pdf(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('status', '0');
+		$this->db->where('disapprove_reason !=', '');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function get_user_approved_pdf(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('status', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function get_user_approved_pdf_limit(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function get_user_pending_pdf_limit(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '0');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function get_user_rejected_pdf_limit(){
+		$this->db->where('publish_by', $_SESSION['user_id']);
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '0');
+		$this->db->where('disapprove_reason !=', '');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function configured_pdf_monthly(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->where('ret_id', $_SESSION['retailer_id']);
+			$num_rows[] = $this->db->count_all_results('ret_pdf_tbl');
+		}
+		$opt=implode(",",$num_rows);
+		return $opt;
+	}
+	public function upload_pdf_mothly(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->like('status', '1');
+			$this->db->like('isDeleted', '0');
+			$num_rows[] = $this->db->count_all_results('pdf_tbl');
+		}
+		$opt=implode(",",$num_rows);
+		return $opt;
+	}
+	public function tot_used_credit_mothly(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->where('ret_id',$_SESSION['retailer_id']);
+			$query = $this->db->get('redeem_invoice_tbl');
+			$tmp_amt=0;
+			foreach ($query->result() as $row){
+				$tmp_amt=($tmp_amt+$row->redeem_price);
+			}
+			$amt[]=$tmp_amt;
+		}
+		$opt=implode(",",$amt);
+		return $opt;
+	}
+	public function tot_sales_montly(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->where('ret_id',$_SESSION['retailer_id']);
+			$num_rows[] = $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		$opt=implode(",",$num_rows);
+		return $opt;
+	}
+	public function tot_sales_montly_direct(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->where('ret_id',$_SESSION['retailer_id']);
+			$this->db->where('sale_type','1');
+			$num_rows[] = $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		$opt=implode(",",$num_rows);
+		return $opt;
+	}
+	public function tot_sales_montly_subs(){
+		$list=array();
+		for($d=1; $d<=31; $d++){
+			$time=mktime(12, 0, 0, date('m'), $d, date('Y'));
+			if (date('m', $time)==date('m'))
+				$list[]=date('Y-m-d', $time);
+		}
+		foreach($list as $date_list){
+			$this->db->like('add_date_time',$date_list);
+			$this->db->where('ret_id',$_SESSION['retailer_id']);
+			$this->db->where('sale_type','2');
+			$num_rows[] = $this->db->count_all_results('redeem_invoice_tbl');
+		}
+		$opt=implode(",",$num_rows);
+		return $opt;
+	}
+	public function tot_user(){
+		$this->db->where('user_type', 'user');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function tot_ret(){
+		$this->db->where('user_type', 'retailer');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function select_all_sales(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function select_all_sales_direct(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->where('sale_type', '1');
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	public function select_all_sales_subs(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->where('sale_type', '2');
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	
+	public function tot_credit(){
+	    return $this->retailer_detail($_SESSION['retailer_id'])->credit;
+	}
+	
+	public function tot_used_credit(){
+		return $this->retailer_detail($_SESSION['retailer_id'])->credit_use;
+	}
+	
+	public function credit_purchased(){
+        $this->db->where('ret_id', $_SESSION['retailer_id']);
+        $this->db->order_by("id", "desc");
+		$query = $this->db->get('retailer_credit_invoice_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	
+	public function tot_pdf(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function select_all_publisher(){
+		$this->db->where('user_type','publisher');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function select_get_username($id){
+		$query = $this->db->query("Select * from user where id=".$id."");
+		$row=$query->row();
+		return $row->username;
+	}
+	public function record_pub_payment_count(){
+		 $this->db->where('user_type', 'publisher');
+		 $query = $this->db->get('helf_payment_tbl');  
+         return $query;
+	}
+	public function get_user_type($id){
+		$query = $this->db->query("Select * from user where id=".$id."");
+		$row=$query->row();
+		return $row->user_type;
+	}
+	public function select_pub_payment($id){
+		$this->db->where('pub_id',$id);
+		$query = $this->db->get('redeem_invoice_tbl');
+		$tmp_earn=0;
+		foreach ($query->result() as $row){
+			$pub_offer_cost=$row->pub_offer_cost;
+			$pub_deal_percentage=$row->pub_deal_percentage;
+			$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+			if($row->sale_type==1){
+				$tmp_earn+=$profit_tnp;
+			}
+			else{
+				$per_ins=$profit_tnp/$row->pub_Tot_Ins;
+				$this->db->where('user_id',$row->user_id);
+				$this->db->where('pdf_id',$row->pdf_id);
+				$res = $this->db->get('pdf_book_tbl')->row_array();  
+				$tmp_earn+=($per_ins*$res['no_of_sub_paid']);
+			}
+		}
+		$query = $this->db->get_where('helf_payment_tbl', array('id' => $id));
+		$paid_amt=0;
+		foreach ($query->result() as $row){
+			$paid_amt+=$row->amt;
+		}
+		$query = $this->db->get_where('publisher_package', array('pid' => $id,'buy_mode'=>'1'));
+		$invest_amt=0;
+		foreach ($query->result() as $row){
+			$invest_amt+=$row->buy_price;
+		}
+		return ($tmp_earn-$paid_amt-$invest_amt);
+	}
+
+	public function select_pub_payment_new($id){
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$this->db->where('pub_id',$id);
+		$query = $this->db->get('redeem_invoice_tbl');
+		$tmp_earn=0;
+		foreach ($query->result() as $row){
+			$pub_offer_cost=$row->pub_offer_cost;
+			$pub_deal_percentage=$row->pub_deal_percentage;
+			$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+			if($row->sale_type==1){
+				$tmp_earn+=$profit_tnp;
+			}
+			else{
+				$per_ins=$profit_tnp/$row->pub_Tot_Ins;
+				$this->db->where('user_id',$row->user_id);
+				$this->db->where('pdf_id',$row->pdf_id);
+				$res = $this->db->get('pdf_book_tbl')->row_array();  
+				$tmp_earn+=($per_ins*$res['no_of_sub_paid']);
+			}
+		}
+		$tmp_earn;
+		$query = $this->db->get_where('helf_payment_tbl', array('id' => $id));
+		$paid_amt=0;
+		foreach ($query->result() as $row){
+			$paid_amt+=$row->amt;
+		}
+		$query = $this->db->get_where('publisher_package', array('pid' => $id,'buy_mode'=>'1'));
+		$invest_amt=0;
+		foreach ($query->result() as $row){
+			$invest_amt+=$row->buy_price;
+		}
+		return ($tmp_earn-$paid_amt-$invest_amt);
+	}
+	
+	public function select_package(){
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('package_tbl');  
+        return $query;
+	}
+	
+	public function record_publish_pdf_limit($limit, $start){   
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function userSubsPaid($userId,$pdfId){
+		$this->db->where('user_id',$userId);
+		$this->db->where('pdf_id',$pdfId);
+		$res = $this->db->get('pdf_book_tbl')->row_array();  
+        return $res['no_of_sub_paid'];
+	}
+	
+	public function select_total_invest(){
+		$this->db->where('pid',$_SESSION['publisher_id']);
+		$query = $this->db->get('pub_memory_invoice_tbl');
+		$invest=0;
+		foreach ($query->result() as $row){
+			$invest+=$row->amt;	
+		}
+		return $invest;
+	}
+	
+	public function select_new_total_earn(){
+		$this->db->where('pub_id',$_SESSION['publisher_id']);
+		$query = $this->db->get('redeem_invoice_tbl');
+		$tmp_earn=0;
+		foreach ($query->result() as $row){
+			$pub_offer_cost=$row->pub_offer_cost;
+			$pub_deal_percentage=$row->pub_deal_percentage;
+			$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+			if($row->sale_type==1){
+				$tmp_earn+=$profit_tnp;
+			}
+			else{
+				$per_ins=$profit_tnp/$row->pub_Tot_Ins;
+				$this->db->where('user_id',$row->user_id);
+				$this->db->where('pdf_id',$row->pdf_id);
+				$res = $this->db->get('pdf_book_tbl')->row_array();  
+				$tmp_earn+=($per_ins*$res['no_of_sub_paid']);
+			}
+		}
+		return $tmp_earn;
+	}
+	
+	public function select_new_issue_count(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('publish_by',$_SESSION['publisher_id']);
+		$this->db->like('add_date_time', date('Y-m'));
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	
+	public function select_new_total_count(){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->where('publish_by',$_SESSION['publisher_id']);
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	
+	public function select_related_product(){
+		$this->db->limit(12);
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('pdf_tbl');  
+        return $query;
+	}
+	
+	public function select_slides(){
+		$this->db->order_by("position", "ace");
+		$query = $this->db->get('slider_tbl');  
+        return $query; 
+	}
+	
+	public function select_detailed_sale_report_count(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	
+	public function select_detailed_sale_report_limit($limit, $start){
+		$this->db->order_by("add_date_time", "desc");	
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('redeem_invoice_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	
+	public function select_book_wise_sale_report_count(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->where('sale_type', '1');
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	
+	public function select_subscription_sale_report_count(){
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->where('sale_type', '2');
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	
+	public function select_subscription_sale_report_limit($limit, $start){
+		$this->db->order_by("add_date_time", "desc");
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$this->db->where('sale_type', '2');
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('redeem_invoice_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	
+	public function select_book_wise_sale_report_limit($limit, $start){
+		$this->db->order_by("add_date_time", "desc");
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$this->db->where('sale_type', '1');
+		$this->db->where('ret_id', $_SESSION['retailer_id']);
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('redeem_invoice_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	
+	public function record_customer_count(){
+		$this->db->where('user_type', 'user');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	
+	public function select_customer_limit($limit, $start){   
+		$this->db->where('user_type', 'user');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('user');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	
+	public function record_publisher_count(){
+		$this->db->where('user_type', 'publisher');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	
+	public function record_publisher_count_new(){
+		if($_SESSION['pub_name']){
+			$this->db->where('username', $_SESSION['pub_name']);
+		}
+		if($_SESSION['monthly_pay']){
+			$this->db->join ( 'publisher_tbl', 'publisher_tbl.user_id = user.id' , 'left' );
+			$this->db->where ( 'publisher_tbl.auto_withdraw', '1');
+		}
+		$this->db->where('user_type', 'publisher');
+		$count=0;
+		$query = $this->db->get('user');
+		foreach ($query->result() as $row){
+			$tmp=$this->query_model->select_pub_payment($row->id);
+			if($_SESSION['all']){
+				$count=$count+1;
+			}
+			if($tmp>0){
+				$count=$count+1;
+			}
+		}
+		return $count;
+	}
+	
+	public function record_reatailer_invoice_count(){
+		$this->db->where('pub_id', $_SESSION['publisher_id']);
+		if($_SESSION['sess_keyword']){
+			$this->db->where('ret_id', $_SESSION['sess_keyword']);
+		}
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$num_rows = $this->db->count_all_results('redeem_invoice_tbl');
+		return $num_rows;
+	}
+	
+	public function record_pub_hel_payment_count(){
+		$this->db->where('id', $_SESSION['publisher_id']);
+		$num_rows = $this->db->count_all_results('helf_payment_tbl');
+		return $num_rows;
+	}
+	
+	public function record_publish_pdf_count(){
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	
+	public function trash_pdf_count(){
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('isDeleted','1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	
+	public function ret_search_pdf($search){
+		$this->db->where(array('status' => '1', 'isDeleted' => '0', 'isDonate' => '0'));/* LIKE OR LIKE */
+//		$this->db->or_like(array('title' => $search, 'isbn_no' => $search, 'meta_keyword' => $search));/* LIKE OR LIKE */
+		$this->db->where("(title LIKE '%".$_SESSION['keywords']."%' OR isbn_no LIKE '%".$_SESSION['keywords']."%' OR meta_keyword LIKE '%".$_SESSION['keywords']."%')", NULL, FALSE);
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	
+	public function all_category(){
+		if($_SESSION['cat_d']){
+			$this->db->like('category', $_SESSION['cat_d']);
+		}
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		if($_SESSION['order']){
+			$this->db->order_by("title", $_SESSION['order']);
+		}
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function pub_search_pdf(){
+		
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->like('title',$_SESSION['keywords']);
+		$this->db->where('publish_by', $_SESSION['publisher_id']); 
+		/*
+		$this->db->where('publish_by', $_SESSION['publisher_id']); 
+		$this->db->or_like('isbn_no',$_SESSION['keywords'], 'none');
+		$this->db->or_like('meta_keyword',$_SESSION['keywords'], 'none');	
+		*/
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function record_hel_pub_invoice_limit($limit, $start){   
+		$this->db->where('id', $_SESSION['publisher_id']);
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('helf_payment_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function record_pdf_invoice_limit($limit, $start){   
+		$this->db->where('pub_id', $_SESSION['publisher_id']);
+		if($_SESSION['sess_keyword']){
+			$this->db->where('ret_id', $_SESSION['sess_keyword']);
+		}
+		if($_SESSION['sess_keyword']){
+			$this->db->where('ret_id', $_SESSION['sess_keyword']);
+		}
+		if($_SESSION['m']<=9){
+			$m='0'.$_SESSION['m'];
+		}
+		else{
+			$m=$_SESSION['m'];
+		}
+		$y=$_SESSION['y'];
+		$this->db->like('add_date_time', date($y.'-'.$m));
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('redeem_invoice_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function trash_pdf_limit($limit, $start){   
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('isDeleted', '1');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function ret_search_pdf_limit($limit, $start){
+		$this->db->where(array('status' => '1', 'isDeleted' => '0', 'isDonate' => '0'));/* LIKE OR LIKE */
+	//	$this->db->or_like(array('title' => $_SESSION['keywords'], 'isbn_no' => $_SESSION['keywords'], 'meta_keyword' => $_SESSION['keywords']));/* LIKE OR LIKE */
+		$this->db->where("(title LIKE '%".$_SESSION['keywords']."%' OR isbn_no LIKE '%".$_SESSION['keywords']."%' OR meta_keyword LIKE '%".$_SESSION['keywords']."%')", NULL, FALSE);
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl');
+        if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+				if($row->isDonate==1){
+					
+				}
+				else{
+                $data[] = $row;
+				}
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function pdf_filter_count(){
+		$this->db->or_like('title',$_SESSION['keywords']);
+		$this->db->or_like('isbn_no',$_SESSION['keywords']);
+		$this->db->or_like('meta_keyword',$_SESSION['keywords']);	
+		if(!empty($_SESSION['order'])){
+			$this->db->order_by("title", $_SESSION['order']);
+		}
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function pdf_filter_search_limit($limit, $start){
+		$this->db->where("(title LIKE '%".$_SESSION['keywords']."%' OR isbn_no LIKE '%".$_SESSION['keywords']."%' OR meta_keyword LIKE '%".$_SESSION['keywords']."%')", NULL, FALSE);
+		$this->db->where('isDeleted', '0');
+		$this->db->where('status', '1');
+		$this->db->limit($limit, $start);
+		if(!empty($_SESSION['order'])){
+			$this->db->order_by("title", $_SESSION['order']);
+		}
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function category_filer($limit, $start){
+		if($_SESSION['cat_d']){
+			$this->db->like('category', $_SESSION['cat_d']);
+		}
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		if($_SESSION['order']){
+			$this->db->order_by("title", $_SESSION['order']);
+		}
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function pub_search_pdf_limit($limit, $start){
+		$this->db->where('status', '1');
+		$this->db->where('isDeleted', '0');
+		$this->db->like('title',$_SESSION['keywords']);
+		$this->db->where('publish_by', $_SESSION['publisher_id']); 
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function record_un_publish_pdf_count(){
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('status', '0');
+		$this->db->where('isDeleted', '0');
+		$num_rows = $this->db->count_all_results('pdf_tbl');
+		return $num_rows;
+	}
+	public function ret_pdf_tbl_count(){
+		$this->db->where('publish_by', $_SESSION['retailer_id']);
+		$num_rows = $this->db->count_all_results('ret_pdf_tbl');
+		return $num_rows;
+	}
+
+	public function record_un_publish_pdf_limit($limit, $start){   
+		$this->db->where('publish_by', $_SESSION['publisher_id']);
+		$this->db->where('status', '0');
+		$this->db->where('isDeleted', '0');
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function ret_pdf_tbl_limit($limit, $start){   
+		$this->db->where('publish_by', $_SESSION['retailer_id']);
+		$this->db->limit($limit, $start);
+		$this->db->order_by("id", "desc");
+		$query = $this->db->get('ret_pdf_tbl'); 
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function select_publisher_limit($limit, $start){
+		if($_SESSION['pub_name']){
+			$this->db->where('username', $_SESSION['pub_name']);
+		}
+		if($_SESSION['monthly_pay']){
+			$this->db->join ( 'publisher_tbl', 'publisher_tbl.user_id = user.id' , 'full' );
+			$this->db->where ( 'publisher_tbl.auto_withdraw', '1');
+		}
+		$this->db->where('user_type', 'publisher');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('user');  
+		
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+				$tmp=$this->query_model->select_pub_payment($row->id);
+				if($_SESSION['all']){
+					$data[] = $row;
+				}
+				if($tmp>0){
+					 $data[] = $row;
+				}
+               
+            }
+            return $data;
+        }
+        return false;
+    }
+
+	public function publisher_list(){
+		$this->db->select('id,username');
+		$this->db->where('user_type', 'publisher');
+		$query = $this->db->get('user');  
+			if ($query->num_rows() > 0) {
+				foreach ($query->result() as $row) {
+					$data[] = $row;
+				}
+				return $data;
+            }
+        return false;
+	}
+	
+	public function publisher_mth_pay_opt(){
+		$pubs=$this->publisher_list();
+		foreach ($pubs as $pub){
+			$this->db->select('user_id,auto_withdraw_date');
+			$this->db->where('user_id', $pub->id);
+			$this->db->where('auto_withdraw', '1');
+			$query = $this->db->get('publisher_tbl');
+			if ($query->num_rows() > 0) {
+					foreach ($query->result() as $row) {
+						$mth_opted[]= $row;
+					}
+				}
+			}
+		return $mth_opted;
+	}
+	
+	public function isAccountVarified($id){
+		$this->db->select('bank_varified');
+		$this->db->where('user_id', $id);
+		$res = $this->db->get('publisher_tbl')->row_array();
+		return $res['bank_varified'];
+	}
+
+	public function getVerificationDoc($id){
+		$this->db->select('canceled_chq');
+		$this->db->where('user_id', $id);
+		$res = $this->db->get('publisher_tbl')->row_array();
+		if(!empty($res)){
+			return $res['canceled_chq'];
+		}else{
+			return false;
+		}
+	}
+
+	public function check_pub_mth_pay_opt_by_id($id){
+		$this->db->select('user_id');
+		$this->db->where('user_id', $id);
+		$this->db->where('auto_withdraw', '1');
+		$query = $this->db->get('publisher_tbl');
+		if ($query->num_rows() > 0) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public function publisher_mth_pay_not_opt(){
+		$pubs=$this->publisher_list();
+		foreach ($pubs as $pub){
+			$this->db->select('user_id');
+			$this->db->where('user_id', $pub->id);
+			$this->db->where('auto_withdraw', '0');
+			$query = $this->db->get('publisher_tbl');
+			if ($query->num_rows() > 0) {
+					foreach ($query->result() as $row) {
+						$mth_not_opted[]= $row;
+					}
+				}
+			}
+		return $mth_not_opted;
+	}
+
+	public function get_first_biz_year(){
+		$this->db->order_by('add_date_time','ASC');
+		$this->db->select('add_date_time');
+		$this->db->limit(1);
+		$query = $this->db->get('redeem_invoice_tbl')->row();
+		$firstBiz=$query->add_date_time;
+		$firstBizYear=date("Y", strtotime($firstBiz));
+		return intval($firstBizYear);
+	}
+	
+	public function check_payout_processed($year,$month_name){
+		$this->db->where('year_chk', $year);
+		$this->db->where('month_chk', $month_name);
+		$query = $this->db->get('monthy_payout');
+		if ($query->num_rows() > 0) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+	public function check_pub_payout_processed($pub_id,$month_name,$year){
+		$this->db->where('id', $pub_id);
+		$this->db->where('payout_month', $month_name);
+		$this->db->where('payout_year', $year);
+		$query =$this->db->get('helf_payment_tbl');
+		if ($query->num_rows() > 0) {
+			return true;
+		}else{
+			return false;
+		}
+	}
+	public function get_month_name($month){
+		$time = mktime(0, 0, 0, $month);
+		$month_name = strftime("%b", $time);
+		return $month_name;
+	}
+	
+	public function get_payments_till($id,$date){
+		$this->db->select('amt');
+		$this->db->where('id', $id);
+		$this->db->where('mode', 'wallet');
+		$this->db->where('pay_date <=', $date);
+		$res =$this->db->get('helf_payment_tbl')->row();
+		foreach($res as $amt){
+			$paid[]=$amt;
+		}
+		return array_sum($paid);
+	}
+	
+	public function get_payout_till($id,$date){
+		$this->db->where('pub_id',$id);
+		$this->db->where('add_date_time <=',$date);
+		$query = $this->db->get('redeem_invoice_tbl');
+		$tmp_earn=0;
+		foreach ($query->result() as $row){
+			$pub_offer_cost=$row->pub_offer_cost;
+			$pub_deal_percentage=$row->pub_deal_percentage;
+			$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+			if($row->sale_type==1){
+				$tmp_earn+=$profit_tnp;
+			}
+			else{
+				$per_ins=$profit_tnp/$row->pub_Tot_Ins;
+				$this->db->where('user_id',$row->user_id);
+				$this->db->where('pdf_id',$row->pdf_id);
+				$res = $this->db->get('pdf_book_tbl')->row_array();  
+				$tmp_earn+=($per_ins*$res['no_of_sub_paid']);
+			}
+		}
+		$this->db->where('id',$id);
+		$this->db->where('pay_date',$date);
+		$query = $this->db->get('helf_payment_tbl');
+		$paid_amt=0;
+		foreach ($query->result() as $row){
+			$paid_amt+=$row->amt;
+		}
+		$this->db->where('pid',$id);
+		$this->db->where('buy_mode','1');
+		$this->db->where('booking_date <=',$date);
+		$query = $this->db->get_where('publisher_package', array('pid' => $id,'buy_mode'=>'1'));
+		$invest_amt=0;
+		foreach ($query->result() as $row){
+			$invest_amt+=$row->buy_price;
+		}
+		return ($tmp_earn-$paid_amt-$invest_amt);
+	}
+	public function calculate_payout($id,$fd,$ld){
+		######### Calculate Regular Payout #################
+		$this->db->where('pub_id', $id);
+		$this->db->where('add_date_time >=', $fd);
+		$this->db->where('add_date_time <=', $ld);
+		$query = $this->db->get('redeem_invoice_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row){
+			$pub_offer_cost=$row->pub_offer_cost;
+			$pub_deal_percentage=$row->pub_deal_percentage;
+			$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+			if($row->sale_type==1){
+				$pay[]=$profit_tnp;
+			}
+			else{
+				$tot_Inst=$row->pub_Tot_Ins;
+				$inst_paid=$row->sub_count;
+				$pub_offer_cost=$row->pub_offer_cost;
+				$pub_deal_percentage=$row->pub_deal_percentage;
+				$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+				$per_ins=$profit_tnp/$tot_Inst;
+				$x=($per_ins*$inst_paid);
+				$pay[]=$x;
+			} 
+			$i++;
+			}
+			$payout=array_sum($pay);
+			return $payout;
+		}
+	}
+	
+	public function gen_pub_month_payout($month,$year){
+		$time = mktime(0, 0, 0, $month);
+		$month_name = strftime("%b", $time);
+		$pubs=$this->query_model->publisher_mth_pay_opt();
+		if($month<=9){
+			$month='0'.$month;
+		}
+		$firstDate=$year."-".$month."-"."01";
+		$lastDate= date('Y-m-t', strtotime($firstDate));
+		foreach($pubs as $pub){
+			$pub_auto_withdraw=$pub->auto_withdraw_date;
+			$pub=$pub->user_id;
+			if(!empty($pub_auto_withdraw)){
+				if($pub_auto_withdraw < $firstDate){
+					$payout =$this->query_model->calculate_payout($pub,$firstDate,$lastDate);
+				}elseif($pub_auto_withdraw > $lastDate){
+					$paid=$this->query_model->get_payments_till($pub,$pub_auto_withdraw);
+					$toBePaid=$this->query_model->get_payout_till($pub,$lastDate);
+					$due=$toBePaid - $paid;
+					$payout = $due;
+				}else{
+					$paid=$this->query_model->get_payments_till($pub,$pub_auto_withdraw);
+					$toBePaid=$this->query_model->get_payout_till($pub,$pub_auto_withdraw);
+					$due=$toBePaid - $paid;
+					$firstDate = $pub_auto_withdraw;
+					$payout =$this->query_model->calculate_payout($pub,$firstDate,$lastDate);
+					if(empty($payout)){
+						$payout=0;
+					}
+					$payout = $payout + $due;
+				}
+					if(!empty($payout)){
+							$data=array(
+							'id' => $pub,
+							'user_type' => 'publisher',
+							'mode' => 'monthly',
+							'payout_year' => $year,
+							'payout_month' => $month_name,
+							'process_date' => date('Y-m-d'),
+							'amt' =>$payout,
+						);
+						$this->db->insert('helf_payment_tbl', $data);
+					}
+			}
+		}
+		/*
+		foreach($pubs as $pub){
+			$pub=$pub->user_id;
+			$processed = $this->check_pub_payout_processed($pub,$month_name,$year);
+			if($processed == false){
+				$this->db->where('pub_id', $pub);
+				$this->db->where('add_date_time >=', $firstDate);
+				$this->db->where('add_date_time <=', $lastDate);
+				$query = $this->db->get('redeem_invoice_tbl');
+				if ($query->num_rows() > 0) {
+					foreach ($query->result() as $row){
+					$pub_offer_cost=$row->pub_offer_cost;
+					$pub_deal_percentage=$row->pub_deal_percentage;
+					$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+					if($row->sale_type==1){
+						$pay[]=$profit_tnp;
+					}
+					else{
+						$tot_Inst=$row->pub_Tot_Ins;
+						$inst_paid=$row->sub_count;
+						$pub_offer_cost=$row->pub_offer_cost;
+						$pub_deal_percentage=$row->pub_deal_percentage;
+						$profit_tnp=$pub_offer_cost-($pub_offer_cost*$pub_deal_percentage)/100;
+						$per_ins=$profit_tnp/$tot_Inst;
+						$x=($per_ins*$inst_paid);
+						$pay[]=$x;
+					} 
+					$i++;
+					}
+					$payout=array_sum($pay);
+					if(!empty($payout)){
+							$data=array(
+							'id' => $pub,
+							'user_type' => 'publisher',
+							'mode' => 'monthly',
+							'payout_year' => $year,
+							'payout_month' => $month_name,
+							'process_date' => date('Y-m-d'),
+							'amt' =>$payout,
+						);
+						$this->db->insert('helf_payment_tbl', $data);
+					}
+				}
+			}
+		}
+		*/
+		return $this->query_model->payout_generated($month_name,$year);
+	}
+
+	public function payout_generated($month_name,$year){
+		$this->db->where('payout_year', $year);
+		$this->db->where('payout_month', $month_name);
+		$query = $this->db->get('helf_payment_tbl');
+		if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	
+	public function payout_generated_for($month_name,$year,$id){
+		$this->db->where('payout_year', $year);
+		$this->db->where('payout_month', $month_name);
+		$this->db->where('id', $id);
+		$res = $this->db->get('helf_payment_tbl')->row_array();
+		return $res;
+	}
+	
+	public function due_payments($pub_uname,$m,$y,$all,$monthly){
+		$month_name=$this->query_model->get_month_name($m);
+		if(!empty($pub_uname)){
+			$id=$this->query_model->get_id_by_pub_name($pub_uname);
+			if(!empty($id)){
+				$monthly_opted = $this->query_model->check_pub_mth_pay_opt_by_id($id);
+				if($monthly_opted == true){
+					$payout = $this->query_model->payout_generated_for($month_name,$y,$id);
+					if(!empty($payout->pay_date)){
+						$this->session->set_flashdata('msg', 'No Payout due for '.$pub_uname.' for the period of '.$month_name.", ".$y);
+					}else{
+						$payouts[]=$payout;
+						return $payouts;
+					}
+				}
+			}
+		}else{
+			if($monthly == true ){
+				$publishers=$this->publisher_mth_pay_opt();
+				foreach($publishers as $publisher){
+					$id=$publisher->user_id;
+					$payout=$this->query_model->payout_generated_for($month_name,$y,$id);
+					if(!empty($payout)){
+						if(empty($payout['pay_date'])){
+							$pay[] = $payout;
+						}
+					}
+				}
+				$payouts=$pay;
+				return $payouts;
+			}else{
+				$publishers=$this->publisher_list();
+				foreach($publishers as $publisher){
+					$id=$publisher->id;
+					$monthly_opted = $this->query_model->check_pub_mth_pay_opt_by_id($id);
+					if($monthly_opted == true){
+						$due = $this->query_model->payout_generated_for($month_name,$y,$id);
+						if(!empty($due)){
+							if(empty($due['pay_date'])){
+								$payouts[]  = $due;
+							}
+						}
+					}else{
+						$due=$this->query_model->select_pub_payment($id);
+						if($all == 1){
+							if($due >= 0){
+								$ar= array(
+									'id' => $id,
+									'user_type' => 'publisher',
+									'mode' => 'wallet',
+									'amt' => $due,
+								);
+								$payouts[]  = $ar;
+							}
+						}
+						else{
+							if($due > 0){
+								$ar= array(
+									'id' => $id,
+									'user_type' => 'publisher',
+									'mode' => 'wallet',
+									'amt' => $due,
+								);
+								$payouts[]  = $ar;
+							}
+						}
+					}
+				}
+			}
+		return $payouts;
+		}
+	}
+	
+	public function dateIndian($date){
+		return date('d M, Y - h:i A', strtotime($date));
+	}
+	
+	public function user_name($id){
+		$query = $this->db->query('SELECT * from user where id='.$id.' ');  		 
+		$row=$query->row();
+		return $row->username;
+	}
+	
+	public function get_id_by_user_name($user_name){
+		$this->db->select('*');
+		$this->db->where('username', $user_name);
+		$res = $this->db->get('user')->row();
+		return $res->id;
+	}
+
+	public function get_id_by_pub_name($user_name){
+		$this->db->select('id');
+		$this->db->where('username', $user_name);
+		$this->db->where('user_type', 'publisher');
+		$res = $this->db->get('user')->row();
+		return $res->id;
+	}
+
+########## Publisher Detail #############
+	public function publisher_name($id){
+			$query = $this->db->query('SELECT * from publisher_tbl where user_id='.$id.' ');  		 
+			$row=$query->row();
+			return $row->pub_comp_name;
+	}
+	
+	public function publisher_bank_acct_info($id){
+		$query = $this->db->query('SELECT ah_name,bank_name,branch_code,Ac_number,ifsc_code from publisher_tbl where user_id='.$id.' ');
+		$row=$query->row_array();
+		return $row;
+	}
+
+	public function select_pub_payment_limit($limit, $start){   
+		$this->db->where('user_type', 'publisher');
+		$this->db->where('pay_date !=', '');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('helf_payment_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function record_retailer_count(){
+		$this->db->where('user_type', 'retailer');
+		$num_rows = $this->db->count_all_results('user');
+		return $num_rows;
+	}
+	public function select_retailer_limit($limit, $start){   
+		$this->db->where('user_type', 'retailer');
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('user');  
+        if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	########################################
+	###########HELF CODE########
+	#######################
+	public function select_skill(){
+		 $query = $this->db->get('skill_tbl');  
+         return $query;  
+	}
+	public function select_business_category(){
+		 $query = $this->db->get('e_card_cat_tbl');  
+         return $query;  
+	}
+	public function select_all_company(){
+		 $query = $this->db->get('company_tbl');  
+         return $query;
+	}
+	public function select_business_city(){
+		$query = $this->db->get('location_tbl');  
+        return $query; 
+	}
+	public function get_cities(){
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('city_tbl'); 
+		if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	
+	public function get_city($id){
+		$this->db->select('city_name');
+		$this->db->where('id', $id);
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('city_tbl');
+		$row=$query->row();
+		return $row->city_name;
+	}
+	
+	public function get_states(){
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('state_tbl'); 
+		if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	
+	public function get_state($id){
+		$this->db->select('state_name');
+		$this->db->where('id', $id);
+		$this->db->where('isDeleted', '0');
+		$query = $this->db->get('state_tbl');
+		$row=$query->row();
+		return $row->state_name;
+	}
+	
+    public function select_partner_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('partner_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+    public function select_cat_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('post_cat_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	 public function select_post_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('post_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function select_post_limit_wherein($limit, $start,$id){   
+		//$this->db->where_in('cat_id', $id);
+		$this->db->like('cat_id', $id);
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('post_tbl');  
+		
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function record_partner_count(){
+		return $this->db->count_all("partner_tbl");
+	}
+	public function record_cat_count(){
+		return $this->db->count_all("post_cat_tbl");
+	}
+	public function record_post_count(){
+		return $this->db->count_all("post_tbl");
+	}
+	
+	public function select_user(){   
+         $query = $this->db->get('user');  
+         return $query;  
+      }
+	public function select_post_cat(){   
+         $query = $this->db->get('post_cat_tbl');  
+         return $query;  
+      }
+	public function select_user_get(){   
+         $query = $this->db->get('dummy');  
+         return $query;  
+      }
+	public function select_trainer($limit, $start){
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('trainer_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function select_profile($limit, $start){
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('company_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function select_login_info($limit, $start){
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('login_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+	}
+	public function record_trainer_count() {
+        return $this->db->count_all("trainer_tbl");
+    }
+	public function record_profile_count() {
+        return $this->db->count_all("company_tbl");
+    }
+	public function login_count() {
+        return $this->db->count_all("login_tbl");
+    }
+    public function user_dtails(){
+    	$this->db->where('id', $_SESSION['user_id']);
+    	$query = $this->db->get('user');  
+         return $query;  
+    }
+	public function login_status_limit(){
+		$this->db->order_by('Last_Login','DESC');
+		$query = $this->db->get('user');  
+        	return $query;  
+	}
+	public function trainer_search_name($trainer_txt){
+		//echo $trainer_txt;
+		$this->db->select('*');
+		$this->db->from('trainer_tbl');
+		$this->db->like('trainer_name', $trainer_txt, 'both'); 
+		$query = $this->db->get();
+		return $query;
+	}
+	
+	public function select_lead(){
+		 $query = $this->db->get('lead_tbl');  
+         return $query;  
+	}
+	public function record_location_count(){
+		return $this->db->count_all("location_tbl");
+	}
+	public function e_card_cat_tbl_count(){
+		return $this->db->count_all("e_card_cat_tbl");
+	}
+	 public function select_location_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('location_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function e_card_cat_tbl_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('e_card_cat_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function record_sub_location_count(){
+		return $this->db->count_all("sub_location_tbl");
+	}
+	public function e_card_sub_cat_tbl_count(){
+		return $this->db->count_all("e_card_sub_cat_tbl");
+	}
+	public function select_sub_location_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('sub_location_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function e_card_sub_cat_tbl_limit($limit, $start){   
+		$this->db->limit($limit, $start);
+		$query = $this->db->get('e_card_sub_cat_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return false;
+    }
+	public function select_feature(){ 
+		 $query = $this->db->get('feature_tbl');  
+         if ($query->num_rows() > 0) {
+            foreach ($query->result() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+	}
+	public function record_grid_ses(){
+		if(isset($_SESSION['newdata'])){
+			$data_ses = $_SESSION['newdata'];        
+			$keyword_txt= $data_ses['keyword_txt'];
+			$location_select= $data_ses['location_select'];
+			$cat_name_select= $data_ses['cat_name_select'];
+			$this->db->where('city',$location_select);
+			$this->db->where('business_cat',$cat_name_select);
+			$this->db->from("company_tbl");
+			return $this->db->count_all_results();
+		}
+		else{
+			return $this->db->count_all("company_tbl");
+		}
+	}
+	public function select_listing_limit_grid($limit, $start){   
+	   if(isset($_SESSION['newdata'])){
+		   $data_ses = $_SESSION['newdata'];        
+			$keyword_txt= $data_ses['keyword_txt'];
+			$location_select= $data_ses['location_select'];
+			$cat_name_select= $data_ses['cat_name_select'];
+			$this->db->limit($limit, $start);
+			if(isset($_SESSION['order_status'])){
+				$this->db->order_by('marriage_hall_name', $_SESSION['order_status']);
+			}
+			else{
+				$this->db->order_by('marriage_hall_name', 'DESC');
+			}
+			$this->db->where('city',$location_select);
+			$this->db->where('business_cat',$cat_name_select);
+			$query = $this->db->get('company_tbl');  
+			 if ($query->num_rows() > 0) {
+				foreach ($query->result() as $row) {
+					$data[] = $row;
+					
+				}
+				return $data;
+			}
+			return false;
+		 }	
+		 else{
+			 $this->db->limit($limit, $start);
+			$query = $this->db->get('company_tbl');  
+			 if ($query->num_rows() > 0) {
+				foreach ($query->result() as $row) {
+					$data[] = $row;
+				}
+				return $data;
+			}
+			return false;
+		 }
+    }
+	public function select_product_category(){
+		 $query = $this->db->get('product_cat_tbl');  
+         return $query;  
+	}
+	public function select_product_cat(){
+		$query = $this->db->get('product_cat_tbl');  
+        return $query; 
+	}
+	public function record_product_count($id){
+		$this->db->where('product_cat', $id);
+		$num_rows = $this->db->count_all_results('product_tbl');
+		return $num_rows;
+	}
+	public function select_product_limit($limit, $start,$id){
+		$this->db->limit($limit, $start);
+		$this->db->where('product_cat',$id);
+		$query = $this->db->get('product_tbl');  
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;	
+			}
+			return $data;
+		}
+		return false;
+	}
+
+
+########## User Detail #############
+	public function user_detail($id){
+		$this->db->select("*");
+		$this->db->where('user_id',$id);
+		$result = $this->db->get('user_details')->row();
+		return $result;
+	}
+	
+	public function user_fullname($id){
+		$user_detail=$this->user_detail($id);
+		return $user_detail->full_name;
+	}
+
+	public function user_profilePic($id){
+		$user_detail->user_detail($id);
+		return $user_detail->profile_pic;
+	}
+
+########## Category Detail #############
+	public function cat_name($id){
+		$this->db->select("cat_name");
+		$this->db->where('id',$id);
+		$result = $this->db->get('cat_tbl')->row_array();
+		return $result['cat_name'];
+	}
+
+########## Book Detail #############
+	public function books_detail($id){
+		$this->db->select("*");
+		$this->db->where('id',$id);
+		$result = $this->db->get('pdf_tbl')->row();
+		return $result;
+	}
+
+	public function books_name($pdfid){
+		$this->db->select("title");
+		$this->db->where('id',$pdfid);
+		$result = $this->db->get('pdf_tbl')->row_array();
+		return $result['title'];
+	}
+
+########## User Books #############
+	public function user_books_count(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->select("*");
+		$this->db->where('user_id',$user_id);
+		$this->db->where('is_Expired !=',1);
+		$query = $this->db->get('pdf_book_tbl');
+		return $query->num_rows();
+	}
+	public function user_active_books_count(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->select("*");
+		$this->db->where('user_id',$user_id);
+		$this->db->where('actvate_status','1');
+		$this->db->where('is_Expired !=',1);
+		$query = $this->db->get('pdf_book_tbl');
+		return $query->num_rows();
+	}
+
+	public function user_books(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->select("*");
+		$this->db->where('user_id',$user_id);
+		$this->db->where('is_Expired !=',1);
+		$query = $this->db->get('pdf_book_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;	
+			}
+			return $data;
+		}
+		return false;
+	}
+
+	public function user_book_name_array(){
+		$books=$this->user_books();
+		foreach ($books as $row) {
+			$data[]= array(
+						'id' => $row->id,
+						'pdf_id' => $row->pdf_id,
+						'title' => $this->books_name($row->pdf_id),
+						'actvate_status' => $row->actvate_status
+						);
+		}
+		return $data;
+	}
+	
+	public function user_panel_book_view(){
+		$user_books = $this->user_books();
+		foreach ($user_books as $row){
+		$books_detail = $this->books_detail($row->pdf_id);
+	?>
+		<div class="product-main-box">
+			<div class="single-banner">
+				<div class="product-wrapper ">
+					<?php if($row->actvate_status == 1){?>
+						<a href="<?= base_url();?>pdf_details?_D=<?= $books_detail->id;?>" class="single-banner-image-wrapper">
+					<?php } ?>
+					<?php
+						$file =  base_url().'uploads/library/thumb_new/'.$books_detail->thumb_new;
+						$url=getimagesize($file);
+						if(!is_array($url)){
+							$file=base_url().'uploads/library/thumb/'.$books_detail->thumb;
+						}
+					?>
+					<div class="aspect">
+						<img src="<?=$file;?>" class="img-responsive image <?php if($row->actvate_status == 1){?> activated <?php } ?>">
+						<?php if($row->actvate_status == 0){?>
+						<div class="overlay-layer"><a href="<?= base_url();?>user/learn?_D=<?= $row->id;?>"><i class="icon-QR-Code-01-01" aria-hidden="true" style="font-size: 28px;"></i></a></div>
+							<!--<div class="middle">
+								<div class="text"><a href="<?= base_url();?>user/learn?_D=<?= $row->id;?>"><i class="icon-QR-Code-01-01" aria-hidden="true" style="font-size: 28px;"></i></a></div>
+							</div>-->
+						<?php } ?>
+					</div>
+					<?php if($row->actvate_status == 1){?>
+						</a>
+					<?php } ?>
+				</div>
+				<div class="banner-bottom user-panel">
+					<?php if($row->actvate_status == 1){?>
+						<a href="<?= base_url();?>pdf_details?_D=<?= $books_detail->id;?>" class="single-banner-image-wrapper"><?= $books_detail->title;?></a>
+					<?php }else{ ?>
+						<a href="<?= base_url();?>user/learn?_D=<?= $row->id;?>"><?= $books_detail->title;?></a>
+					<?php } ?>
+					by <a class="author-link" href="<?= base_url();?>publisher_details?_D=<?= $row->publish_by;?> "><?= $this->publisher_name($books_detail->publish_by);?></a>
+				</div>
+			</div>
+		</div>
+		<?php
+		}
+	}
+
+########## User Donated books #############
+	public function donated_books(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->where('publish_by',$user_id);
+		$query = $this->db->get('pdf_tbl');
+		return $query->num_rows();
+	}
+
+	public function approved_donated_books(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->where('publish_by',$user_id);
+		$this->db->where('status','1');
+		$query = $this->db->get('pdf_tbl');
+		return $query->num_rows();
+	}
+
+	public function unapproved_donated_books(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->where('publish_by',$user_id);
+		$this->db->where('status','0');
+		$query = $this->db->get('pdf_tbl');
+		return $query->num_rows();
+	}
+	public function rejected_donated_books(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->where('publish_by',$user_id);
+		$this->db->where('status','0');
+		$this->db->where('disapprove_reason !=','');
+		$query = $this->db->get('pdf_tbl');
+		return $query->num_rows();
+	}
+########## Retailer Detail #############
+	public function list_retailers(){
+		$this->db->select("*");
+		$query = $this->db->get('retailer_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				if($this->retailer_status($row->user_id) == "1" ){
+					$data[] = $row;	
+				}
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function find_retailer_by_pincode($pincode){
+		$this->db->select("*");
+		$this->db->where('pin_code',$pincode);
+		$query = $this->db->get('retailer_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				if($this->retailer_status($row->user_id) == "1" ){
+					$data[] = $row;	
+				}
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function retailer_detail($id){
+		$this->db->select("*");
+		$this->db->where('user_id',$id);
+		$result = $this->db->get('retailer_tbl')->row();
+		return $result;
+	}
+	
+	public function reGenerateQR(){
+		$id=$_SESSION['user_id'];
+		$this->db->select("qr_code,qr_image");
+		$this->db->where('user_id',$id);
+		$result = $this->db->get('user_details')->row();
+		$this->load->library('ciqrcode');
+		$result->qr_code;
+		$params['data'] = $result->qr_code;
+		$params['level'] = 'H';
+		$params['size'] = 8;
+		$params['savename'] ="./uploads/user/qr/".$result->qr_image;
+		$this->ciqrcode->generate($params);
+		echo '<img src="'.base_url().'uploads/user/qr/'.$qr_image.'" style="width:100%;"/>';
+	}
+	
+	public function getJustForYou(){
+		$user_id=$_SESSION['user_id'];
+		$this->db->where('user_id',$user_id);
+		$this->db->group_by('id, user_book_hits.pdf_id');
+	//    $this->db->order_by('pdf_id','desc');
+		$query = $this->db->get('user_book_hits');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row->pdf_id;	
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function getReportedBooks(){
+		$this->db->select("pdf_id");
+		$this->db->group_by('id, pdf_report_tbl.pdf_id');
+		$query = $this->db->get('pdf_report_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function getClaimedBooks(){
+		$this->db->select("*");
+		$query = $this->db->get('copy_right_claims');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function getReports($pdf_id){
+		$this->db->select("report_type");
+		$this->db->where("pdf_id",$pdf_id);
+		$this->db->group_by('id, pdf_report_tbl.report_type');
+		$query = $this->db->get('pdf_report_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function reportedByCount($pdf_id,$report_type){
+		$this->db->select("user_id");
+		$this->db->where("pdf_id",$pdf_id);
+		$this->db->where("report_type",$report_type);
+		$query = $this->db->get('pdf_report_tbl');
+		return $query->num_rows();
+	}
+
+	public function reportBy($pdf_id,$report_type){
+		$this->db->select("user_id");
+		$this->db->where("pdf_id",$pdf_id);
+		$this->db->where("report_type",$report_type);
+		$query = $this->db->get('pdf_report_tbl');
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;
+			}
+			return $data;
+		}
+		return false;
+	}
+	
+	public function userType($user_id){
+		$this->db->select('user_type');
+		$this->db->where('id',$user_id);
+		$result = $this->db->get('user')->row();
+		return $result->user_type;
+	}
+	
+	public function userEmail($user_id){
+		$this->db->select('email_id');
+		$this->db->where('id',$user_id);
+		$result = $this->db->get('user')->row();
+		return $result->email_id;
+	}
+	
+	public function subsDetail($user_id,$book){
+		$SQL="SELECT * FROM `redeem_invoice_tbl` WHERE `pdf_id`=".$book." AND `user_id`=".$user_id.";";
+		$query = $this->db->query($SQL);
+		//return $query->result_array();
+		if ($query->num_rows() > 0) {
+			foreach ($query->result() as $row) {
+				$data[] = $row;
+			}
+			return $data;
+		}
+		return false;
+	}
+
+	public function isApproved($book){
+	//    $book = $this->db->escape($book);
+		$this->db->select('status');
+		$this->db->where('id', $book);
+		$res = $this->db->get('pdf_tbl')->row();
+		$status = $res->status;
+		if($status == "1"){
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+	public function margins(){
+		$res = $this->db->get('helf_margin')->row();
+		return $res;
+	}
+	
+	public function retailer_status($retailer_id){
+		$this->db->select('status');
+		$this->db->where('id', $retailer_id);
+		$row = $this->db->get('user')->row();
+		$status=$row->status;
+		return $status;
+	}
+	
+	###################################################
+	###########	Amount Conversion to Word ##############
+	public function amount2Word($amt){
+			$number = $amt;
+		   $no = round($number);
+		   $point = round($number - $no, 2) * 100;
+		   $hundred = null;
+		   $digits_1 = strlen($no);
+		   $i = 0;
+		   $str = array();
+		   $words = array('0' => '', '1' => 'one', '2' => 'two',
+			'3' => 'three', '4' => 'four', '5' => 'five', '6' => 'six',
+			'7' => 'seven', '8' => 'eight', '9' => 'nine',
+			'10' => 'ten', '11' => 'eleven', '12' => 'twelve',
+			'13' => 'thirteen', '14' => 'fourteen',
+			'15' => 'fifteen', '16' => 'sixteen', '17' => 'seventeen',
+			'18' => 'eighteen', '19' =>'nineteen', '20' => 'twenty',
+			'30' => 'thirty', '40' => 'forty', '50' => 'fifty',
+			'60' => 'sixty', '70' => 'seventy',
+			'80' => 'eighty', '90' => 'ninety');
+		   $digits = array('', 'hundred', 'thousand', 'lakh', 'crore');
+		   while ($i < $digits_1) {
+			 $divider = ($i == 2) ? 10 : 100;
+			 $number = floor($no % $divider);
+			 $no = floor($no / $divider);
+			 $i += ($divider == 10) ? 1 : 2;
+			 if ($number) {
+				$plural = (($counter = count($str)) && $number > 9) ? 's' : null;
+				$hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
+				$str [] = ($number < 21) ? $words[$number] .
+					" " . $digits[$counter] . $plural . " " . $hundred
+					:
+					$words[floor($number / 10) * 10]
+					. " " . $words[$number % 10] . " "
+					. $digits[$counter] . $plural . " " . $hundred;
+			 } else $str[] = null;
+		  }
+		  $str = array_reverse($str);
+		  $result = implode('', $str);
+		  $points = ($point) ?
+				$words[$point / 10] . " " . 
+				  $words[$point = $point % 10] : '';
+		$ret="Rupees  " . ucwords($result);
+		if($points){
+			$ret.= " and " . $points . " Paise only";
+		}else{
+			$ret.= " only";
+		}
+		
+		  return $ret;
+	}
+	
+}  
+?>
